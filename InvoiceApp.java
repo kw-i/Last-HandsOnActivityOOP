@@ -1,68 +1,88 @@
+import java.sql.*;
+import java.util.List;
 import java.util.Scanner;
 
 public class InvoiceApp {
-    public static void main(String[] args) {
-        InvoiceDatabase dbManager = new InvoiceDatabase();
-        Scanner scanner = new Scanner(System.in);
-        while(true){
-            System.out.println("--- Invoice Menu ---");
-            System.out.println("1. Add Invoice");
-            System.out.println("2. Displace Invoices with Balance");
-            System.out.println("3. Pay Invoice");
-            System.out.println("4. Delete Invoice");
-            System.out.println("5. Exit");
-            System.out.print("Choose an Option: ");
-            int choice = scanner.nextInt();
-            scanner.nextLine();
-            System.out.println();
 
-            if (choice == 1){
-                System.out.print("Enter Invoice Number: ");
-                String invno = scanner.nextLine();
-                System.out.print("Enter Customer Name: ");
-                String customer = scanner.nextLine();
-                System.out.print("Enter Invoice Amount: ");
-                int amount = scanner.nextInt();
-                int payment = 0;
-                if (dbManager.addInfo(invno,customer,amount,payment)) {
-                        System.out.println("User successfully added.");
-                    } else {
-                        System.out.println("Failed to add user.");
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        InvoiceDatabase db = new InvoiceDatabase();
+        int choice;
+
+        do {
+            System.out.println("\n--- Invoice Menu ---");
+            System.out.println("1. Add Invoice");
+            System.out.println("2. Pay Invoice");
+            System.out.println("3. Exit");
+            System.out.print("Choose an option: ");
+            choice = Integer.parseInt(scanner.nextLine().trim());
+
+            switch (choice) {
+                case 1:
+                    // ── Add Invoice ──────────────────────────────────────
+                    System.out.print("Enter Invoice Number: ");
+                    String invoiceNumber = scanner.nextLine().trim();
+
+                    System.out.print("Enter Customer Name: ");
+                    String customerName = scanner.nextLine().trim();
+
+                    System.out.print("Enter Invoice Amount: ");
+                    double amount = Double.parseDouble(scanner.nextLine().trim());
+
+                    Invoice invoice = new Invoice(invoiceNumber, customerName, amount, 0);
+                    db.addInvoice(invoice);
+                    break;
+
+                case 2:
+                    // ── Pay Invoice ──────────────────────────────────────
+                    System.out.print("Enter Customer Name: ");
+                    String payCustomer = scanner.nextLine().trim();
+
+                    List<Invoice> invoices = db.getInvoicesWithBalance(payCustomer);
+
+                    if (invoices.isEmpty()) {
+                        System.out.println("No outstanding invoices for " + payCustomer + ".");
+                        break;
                     }
-            }
-            else if (choice == 2){
-                dbManager.displayInvoice();
-            }
-            else if (choice == 3){
-                System.out.print("Enter Invoice Number to pay: ");
-                String invno = scanner.nextLine();
-                System.out.print("Enter payment amount: ");
-                int payment = scanner.nextInt();
-                if (dbManager.updatePayment(invno,payment)) {
-                        System.out.println("Payment recorded.");
-                    } else {
-                        System.out.println("Payment Failed.");
+
+                    System.out.println("\n--- Invoices with Balance ---");
+                    for (Invoice inv : invoices) {
+                        System.out.println(inv);
                     }
-                System.out.println();
+
+                    System.out.print("Enter total payment amount: ");
+                    double payment = Double.parseDouble(scanner.nextLine().trim());
+
+                    // Distribute payment FIFO
+                    double remaining = payment;
+                    for (Invoice inv : invoices) {
+                        if (remaining <= 0) break;
+                        double balance = inv.getBalance();
+                        if (remaining >= balance) {
+                            inv.setPaid(inv.getAmount());
+                            remaining -= balance;
+                        } else {
+                            inv.setPaid(inv.getPaid() + remaining);
+                            remaining = 0;
+                        }
+                        db.updatePaid(inv.getInvoiceNumber(), inv.getPaid());
+                    }
+
+                    System.out.println("Payment distributed successfully.");
+                    double updatedBalance = db.getTotalBalance(payCustomer);
+                    System.out.println("Updated Total Balance for " + payCustomer + ": " + (int) updatedBalance);
+                    break;
+
+                case 3:
+                    System.out.println("Exiting...");
+                    break;
+
+                default:
+                    System.out.println("Invalid option. Please try again.");
             }
-            else if (choice == 4){
-                System.out.print("Enter Invoice Number to Delete: ");
-                String invnodel = scanner.nextLine();
-                Boolean Result = dbManager.deleteInvoice(invnodel);
-                if (Result == true){
-                    System.out.println("Invoice deleted successfully.");
-                }
-                else{
-                    System.out.println("Cannot delete invoice. Payment has already been made");
-                }
-            }
-            else if (choice == 5){
-                scanner.close();
-                break;
-            }
-            else{
-                 System.out.println("Rioben <3 Kate");
-            }
-        }
+
+        } while (choice != 3);
+
+        scanner.close();
     }
 }
